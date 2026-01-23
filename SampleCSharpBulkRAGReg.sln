@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 18
+VisualStudioVersion = 18.0.11222.15 d18.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SampleCSharpBulkRAGReg", "SampleCSharpBulkRAGReg\SampleCSharpBulkRAGReg.csproj", "{BC13F074-704D-4280-9D1E-0D8A6E0BC0C6}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{BC13F074-704D-4280-9D1E-0D8A6E0BC0C6}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BC13F074-704D-4280-9D1E-0D8A6E0BC0C6}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BC13F074-704D-4280-9D1E-0D8A6E0BC0C6}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BC13F074-704D-4280-9D1E-0D8A6E0BC0C6}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {2B9F5A87-EEE8-4C45-A572-F4CBD7D7AED9}
+	EndGlobalSection
+EndGlobal

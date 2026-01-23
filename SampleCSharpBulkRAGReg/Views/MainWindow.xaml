@@ -1,0 +1,173 @@
+﻿<Window x:Class="SampleCSharpBulkRAGReg.Views.MainWindow"
+        x:Name="window"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
+        xmlns:local="clr-namespace:SampleCSharpBulkRAGReg.Views"
+        xmlns:prop="clr-namespace:SampleCSharpBulkRAGReg.Properties"
+        xmlns:converter="clr-namespace:SampleCSharpBulkRAGReg.Converters"
+        Icon="/Images/GAP_ICON2.ico"
+        mc:Ignorable="d"
+        FontFamily="Meiryo UI"
+        Title="Windows UI Sample for Fujitsu Cloud Service Generative AI Platform" Height="450" Width="800"
+        DataContext="{Binding ViewModel, RelativeSource={RelativeSource Mode=Self}}"
+        d:DataContext="{d:DesignInstance IsDesignTimeCreatable=False}">
+    <Window.Resources>
+        <converter:NegativeConverter x:Key="NegativeConverter"/>
+        <converter:Boolean2CollapsedConverter x:Key="Boolean2CollapsedConverter"/>
+        <converter:Boolean2VisibilityConverter x:Key="Boolean2VisibilityConverter"/>
+        <converter:Null2FalseConverter x:Key="Null2FalseConverter"/>
+    </Window.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="1" Background="WhiteSmoke" >
+            <Grid.ColumnDefinitions>
+                <!-- 30% : 70% の比率を Star サイズで表現 -->
+                <ColumnDefinition Width="4*" />
+                <ColumnDefinition Width="6*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- 例: 左側リストを第1列に配置 -->
+            <ListBox x:Name="listBoxMessage" Grid.Column="0" HorizontalContentAlignment="Stretch"
+                     ScrollViewer.HorizontalScrollBarVisibility="Disabled"
+                     ScrollViewer.VerticalScrollBarVisibility="Visible"
+                     VirtualizingPanel.IsVirtualizing="True"
+                     VirtualizingPanel.ScrollUnit="Pixel"
+                     ScrollViewer.IsDeferredScrollingEnabled="False"
+                     ScrollViewer.PanningMode="VerticalOnly"
+                     SelectionMode="Single" Margin="0,0,0,0" Padding="20,0,20,0"
+                     BorderThickness="0" Background="Transparent" Focusable="False"
+                     Visibility="{Binding IsLogin, Converter={StaticResource Boolean2VisibilityConverter}}"
+                     ItemsSource="{Binding Retrievers}" >
+                <ListBox.Style>
+                    <Style TargetType="{x:Type ListBox}">
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="{x:Type ListBox}">
+                                    <Border Name="Bd"
+                                        Background="{TemplateBinding Background}"
+                                        BorderBrush="{TemplateBinding BorderBrush}"
+                                        BorderThickness="{TemplateBinding BorderThickness}">
+                                        <ScrollViewer Padding="{TemplateBinding Padding}"
+                                                  Focusable="false">
+                                            <ItemsPresenter SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}"/>
+                                        </ScrollViewer>
+                                    </Border>
+                                    <ControlTemplate.Triggers>
+                                        <Trigger Property="IsEnabled" Value="false">
+                                            <Setter TargetName="Bd" Property="Background" Value="Transparent"/>
+                                        </Trigger>
+                                    </ControlTemplate.Triggers>
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                    </Style>
+                </ListBox.Style>
+                <ListBox.ItemContainerStyle>
+                    <Style TargetType="ListBoxItem">
+                        <Setter Property="Template">
+                            <Setter.Value>
+                                <ControlTemplate TargetType="{x:Type ContentControl}">
+                                    <ContentPresenter />
+                                </ControlTemplate>
+                            </Setter.Value>
+                        </Setter>
+                        <Setter Property="Margin" Value="0,0,0,0" />
+                        <Setter Property="Padding" Value="0"/>
+                        <Setter Property="BorderThickness" Value="0"/>
+                        <Setter Property="Focusable" Value="False" />
+                    </Style>
+                </ListBox.ItemContainerStyle>
+                <ListBox.ItemTemplate>
+                    <DataTemplate>
+                        <local:RetrieverPanel />
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+
+            <!-- 例:右側のログ表示を第2列に配置 -->
+            <TextBox Grid.Column="1" Margin="0,0,0,0" Padding="20,0,20,0"
+                 BorderThickness="0" Background="White" IsReadOnly="True" 
+                 TextWrapping="Wrap" VerticalScrollBarVisibility="Auto"
+                 Text="{Binding LogText, Mode=OneWay}" />
+        </Grid>
+
+        <Grid VerticalAlignment="Bottom" Grid.Row="2" Background="LightGray" IsEnabled="{Binding IsLogin, Mode=OneWay}">
+            <Grid Margin="25,9,25,9">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Text="{Binding FolderName, Mode=OneWay}" VerticalAlignment="Center" FontSize="12" TextWrapping="NoWrap" />
+                <StackPanel Grid.Column="1" Margin="0,0,5,0" Orientation="Horizontal" VerticalAlignment="Center" Background="White" Height="27" Visibility="{Binding IsPublic, Mode=OneWay, Converter={StaticResource Boolean2VisibilityConverter}}">
+                    <RadioButton Content="Use Public" Width="88" VerticalAlignment="Center" IsChecked="{Binding IsPublic, Mode=OneWay}" GroupName="Public"  />
+                </StackPanel>
+                <Button Grid.Column="2"  Margin="0,0,5,0" Content="{x:Static prop:Resources.Save}"
+                        Width="88" Height="27" FontWeight="Bold" FontSize="14" Background="White"
+                        Command="{Binding SaveCommand}">
+                    <Button.Style>
+                        <Style TargetType="Button">
+                            <!-- デフォルトは有効 -->
+                            <Setter Property="IsEnabled" Value="True" />
+                            <Style.Triggers>
+                                <!-- FolderName が空文字の場合は無効 -->
+                                <DataTrigger Binding="{Binding FolderName}" Value="">
+                                    <Setter Property="IsEnabled" Value="False" />
+                                </DataTrigger>
+                                <!-- FolderName が null の場合は無効 -->
+                                <DataTrigger Binding="{Binding FolderName}">
+                                    <DataTrigger.Value>
+                                        <x:Null />
+                                    </DataTrigger.Value>
+                                    <Setter Property="IsEnabled" Value="False" />
+                                </DataTrigger>
+                                <!-- IsBusy が true の場合は無効 -->
+                                <DataTrigger Binding="{Binding IsBusy}" Value="True">
+                                    <Setter Property="IsEnabled" Value="False" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </Button.Style>
+                </Button>
+            </Grid>
+        </Grid>
+
+        <DockPanel Grid.Row="0" IsEnabled="{Binding IsBusy, Converter={StaticResource NegativeConverter}}">
+            <Menu DockPanel.Dock="Top" Padding="0,4,0,4">
+                <Menu.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <DockPanel />
+                    </ItemsPanelTemplate>
+                </Menu.ItemsPanel>
+                <MenuItem Header="{x:Static prop:Resources.MenuFile}">
+                    <MenuItem Command="{Binding ShowDialogCommand}" CommandParameter="SelectFolder" Header="{x:Static prop:Resources.MenuSelectFolder}" IsEnabled="{Binding IsSettings}" />
+                    <Separator />
+                    <MenuItem Command="{Binding ShowDialogCommand}" CommandParameter="Connect" Header="{x:Static prop:Resources.MenuConnect}" Visibility="{Binding IsLogin, Converter={StaticResource Boolean2CollapsedConverter}}" IsEnabled="{Binding IsSettings}" />
+                    <MenuItem Command="{Binding ShowDialogCommand}" CommandParameter="Disconnect" Header="{x:Static prop:Resources.MenuDisconnect}" Visibility="{Binding IsLogin, Converter={StaticResource Boolean2VisibilityConverter}}" />
+                    <MenuItem Command="{Binding ShowDialogCommand}" CommandParameter="Settings" Header="{x:Static prop:Resources.MenuSettings}" />
+                    <Separator />
+                    <MenuItem Header="{x:Static prop:Resources.MenuExit}">
+                        <i:Interaction.Triggers>
+                            <i:EventTrigger EventName="Click">
+                                <i:CallMethodAction TargetObject="{Binding ElementName=window}" MethodName="Close" />
+                            </i:EventTrigger>
+                        </i:Interaction.Triggers>
+                    </MenuItem>
+                </MenuItem>
+                <MenuItem Header="{x:Static prop:Resources.MenuHelp}">
+                    <MenuItem Command="{Binding ShowDialogCommand}" CommandParameter="About" Header="{x:Static prop:Resources.MenuAbout}" />
+                </MenuItem>
+                <MenuItem Header="{Binding UserName}" DockPanel.Dock="Right" HorizontalAlignment="Right" IsHitTestVisible="False" Margin="0,0,20,0" />
+            </Menu>
+        </DockPanel>
+    </Grid>
+</Window>
