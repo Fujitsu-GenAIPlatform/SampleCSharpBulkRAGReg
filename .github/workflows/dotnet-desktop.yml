@@ -1,0 +1,78 @@
+name: Build WPF Application
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+  
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v1
+      with:
+        vs-version: '[17.0, 18.0]'
+    
+    - name: Setup NuGet
+      uses: NuGet/setup-nuget@v1
+      with:
+        nuget-version: 'latest'
+
+    - name: Restore NuGet packages
+      run: nuget restore SampleCSharpBulkRAGReg.sln
+    
+    - name: Build WPF Application
+      run: msbuild SampleCSharpBulkRAGReg.sln /p:Configuration=Release /p:Platform="Any CPU"
+      
+    - name: Upload Build Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: SampleCSharpBulkRAGReg-${{ github.run_number }}
+        path: |
+          $(Build.ArtifactStagingDirectory)\**
+          **\bin\Release\**
+        retention-days: 7
+   
+    - name: Prepare release ZIP
+      shell: pwsh
+      run: |
+        $zipName = "SampleCSharpBulkRAGReg-${{ github.run_number }}.zip"
+        # ビルド出力 (任意のサブフォルダーの bin\Release を含むすべてのファイル) を収集
+        $files = Get-ChildItem -Path . -Recurse -File | Where-Object { $_.FullName -like "*\bin\Release\*" } | Select-Object -ExpandProperty FullName
+        if (-not $files) {
+          Write-Error "No files found under bin\\Release"
+          exit 1
+        }
+        Compress-Archive -Path $files -DestinationPath $zipName -Force
+        Write-Output "Created $zipName"
+
+    - name: Create GitHub Release
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v${{ github.run_number }}
+        release_name: Release ${{ github.run_number }}
+        draft: false
+        prerelease: false
+
+    - name: Upload ZIP to Release
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: SampleCSharpBulkRAGReg-${{ github.run_number }}.zip
+        asset_name: SampleCSharpBulkRAGReg-${{ github.run_number }}.zip
+        asset_content_type: application/zipp
