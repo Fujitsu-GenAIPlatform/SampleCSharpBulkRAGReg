@@ -19,6 +19,7 @@ namespace SampleCSharpBulkRAGReg.Models
     internal class ChatModel : INotifyPropertyChanged
     {
         private SynchronizationContext Context { get; set; } = SynchronizationContext.Current;
+
         public string IdToken { get; private set; } = string.Empty;
 
         #region "認証関連"
@@ -200,6 +201,17 @@ namespace SampleCSharpBulkRAGReg.Models
     }
 
     /// <summary>
+    /// チャットルーム
+    /// </summary>
+    public class TDataChatRoom
+    {
+        public string ID { get; set; } = string.Empty;
+        public string Name { get; set; } = string.Empty;
+        public string ChatTemplateId { get; set; } = string.Empty;
+        public string[] RetrieverIDs { get; set; } = null;
+    }
+
+    /// <summary>
     /// リトリーバー
     /// </summary>
     public class TDataRetriever
@@ -210,5 +222,6 @@ namespace SampleCSharpBulkRAGReg.Models
         public bool IsPublic { get; set; } = false;
         public string EmbeddingModel { get; set; } = string.Empty;
         public string[] OriginIDs { get; set; } = null;
+        public long Created { get; set; } = 0;
     }
 }

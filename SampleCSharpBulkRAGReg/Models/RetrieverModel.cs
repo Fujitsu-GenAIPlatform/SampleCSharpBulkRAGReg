@@ -7,6 +7,7 @@ using System.IO;
 using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Headers;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.Serialization;
 using System.Text;
@@ -18,6 +19,9 @@ namespace SampleCSharpBulkRAGReg.Models
     {
         // IDトークン(有効期限があるのでMainVMから参照)
         private string IdToken { get { return App.MainVM.IdToken; } }
+
+        // チャットルーム一覧（RAG割当の更新のために保持しておく）
+        private List<Models.TDataChatRoom> ChatRooms = new List<Models.TDataChatRoom>();
 
         /// <summary>
         /// リトリーバー一覧を表すコレクション
@@ -111,7 +115,8 @@ namespace SampleCSharpBulkRAGReg.Models
                             ID = item.id,
                             Name = item.name,
                             IsOwner = item.owner == App.MainVM.UserId,
-                            IsPublic = item.pub
+                            IsPublic = item.pub,
+                            Created = item.created_at
                         };
                         this.Retrievers.Add(retriever);
                     }
@@ -148,11 +153,12 @@ namespace SampleCSharpBulkRAGReg.Models
         /// フォルダ指定でのリトリーバー作成処理
         /// </summary>
         /// <param name="folderName"></param>
+        /// <param name="isOverwrite">True:同名リトリーバを置換し、RAG割当済チャットルームも変更する</param>
         /// <returns></returns>
         /// <remarks>
         /// 指定したフォルダのサブフォルダをリトリーバー名として、サブフォルダ内のファイルをRAGデータとして登録する。
         /// </remarks>
-        internal async Task CreateRetrieverFromFolder(string folderName)
+        internal async Task CreateRetrieverFromFolder(string folderName, bool isOverwrite = false)
         {
             if (string.IsNullOrEmpty(folderName)) throw new ArgumentNullException(nameof(folderName));
             if (!Directory.Exists(folderName)) throw new DirectoryNotFoundException($"フォルダが見つかりません: {folderName}");
@@ -161,9 +167,12 @@ namespace SampleCSharpBulkRAGReg.Models
             var subDirs = Directory.GetDirectories(folderName);
 
             // サブフォルダごとにリトリーバーを作成し、配下のファイルをRAGデータとして登録する
+            await this.GetChatRoomsAsync();
             foreach (var subDir in subDirs)
             {
                 var retrieverName = Path.GetFileName(subDir)?.Trim();
+                var targetRetriever = await GetTargetRetriverAsync(retrieverName);
+
                 if (string.IsNullOrEmpty(retrieverName))
                 {
                     // サブフォルダ名が不正な場合はスキップ
@@ -192,6 +201,30 @@ namespace SampleCSharpBulkRAGReg.Models
                         if (!string.IsNullOrEmpty(id))
                         {
                             LogHelper.WriteLog($"リトリーバー '{retrieverName}' を作成しました。ID={id}");
+                            if (!string.IsNullOrEmpty(targetRetriever?.ID) && isOverwrite)
+                            {
+                                // 既存リトリーバーが存在し、置換指定ありの場合はチャットルームのRAG割当を更新する
+                                try
+                                {
+                                    LogHelper.WriteLog($"リトリーバー '{retrieverName}' は既存のリトリーバーを置換します。");
+                                    await this.ReplaceRetrieverInOwnedRoomsAsync(targetRetriever?.ID, id);
+
+                                    // 既存リトリーバーを削除
+                                    await this.DeleteRetrieverAsync(targetRetriever?.ID);
+                                    LogHelper.WriteLog($"リトリーバー '{retrieverName}' の既存リトリーバーを削除しました。ID={targetRetriever?.ID}");
+                                }
+                                catch (Exception ex)
+                                {
+                                    // チャットルームの置換失敗はログに残して続行
+                                    LogHelper.WriteLog($"リトリーバー '{retrieverName}' のチャットルームのRAG割当の置換に失敗しました: {ex.Message}");
+                                    try
+                                    {
+                                        await this.DeleteRetrieverAsync(id);
+                                        LogHelper.WriteLog($"リトリーバー '{retrieverName}' の追加をロールバックしました。ID={targetRetriever?.ID}");
+                                    }
+                                    catch { }
+                                }
+                            }
                         }
                         else
                         {
@@ -216,6 +249,13 @@ namespace SampleCSharpBulkRAGReg.Models
                 // 一覧取得失敗はログに残して無視
                 LogHelper.WriteLog("リトリーバー一覧の再取得に失敗しました。");
             }
+        }
+
+        // 共有リトリーバではないリトリーバーから名前で検索し、もっとも最近のものを返す
+        private async Task<Models.TDataRetriever> GetTargetRetriverAsync(string name)
+        {
+            var target = this.Retrievers.Where((x) => !x.IsPublic && x.Name.Equals(name, StringComparison.OrdinalIgnoreCase)).OrderByDescending((x) => x.Created).FirstOrDefault();
+            return target;
         }
 
         /// <summary>
@@ -545,6 +585,81 @@ namespace SampleCSharpBulkRAGReg.Models
                 default: return "application/octet-stream";
             }
         }
+
+        #region "チャットルーム関連"
+        // 既存チャットルームのレトリーバー置換処理
+        private async Task ReplaceRetrieverInOwnedRoomsAsync(string oldRetrieverID, string newRetrieverID)
+        {
+            foreach (var room in this.ChatRooms)
+            {
+                if (room.RetrieverIDs?.FirstOrDefault((x) => x == oldRetrieverID) != null)
+                {
+                    // 置換対象のレトリーバーが設定されている場合は、APIを呼び出してチャットルームのレトリーバーIDを置換する
+                    var jsonString = await HttpHelper.GetRequestAsync($"/api/v1/chats/{room.ID}", this.IdToken);
+                    using (var json = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(jsonString)))
+                    {
+                        var ser = new System.Runtime.Serialization.Json.DataContractJsonSerializer(typeof(APIData.TChat));
+                        {
+                            var roomData = ser.ReadObject(json) as APIData.TChat;
+
+                            // LINQ による置換
+                            if (roomData.retriever_ids != null && roomData.retriever_ids.Length > 0)
+                            {
+                                roomData.retriever_ids = roomData.retriever_ids
+                                    .Select(id => string.Equals(id, oldRetrieverID, StringComparison.Ordinal) ? newRetrieverID : id)
+                                    .ToArray();
+                            }
+
+                            json.Close();
+
+                            // 更新APIコール 
+                            using (var ms = new MemoryStream())
+                            {
+                                var serializer = new System.Runtime.Serialization.Json.DataContractJsonSerializer(typeof(APIData.TChat));
+                                {
+                                    serializer.WriteObject(ms, roomData);
+                                    var bodyJsonString = Encoding.UTF8.GetString(ms.ToArray());
+                                    jsonString = await HttpHelper.PutRequestAsync($"/api/v1/chats/{roomData.id}", this.IdToken, bodyJsonString);
+                                }
+                            }
+                        }
+                    }
+                    LogHelper.WriteLog($"チャット '{System.IO.Path.GetFileName(room.Name)}' のリトリーバーを置換しました。");
+                }
+            }
+        }
+
+        // チャットルーム一覧を取得する
+        private async Task GetChatRoomsAsync()
+        {
+            // API呼び出し
+            var jsonString = await HttpHelper.GetRequestAsync("/api/v1/chats", this.IdToken);
+
+            // 一覧取得
+            this.ChatRooms.Clear();
+
+            // JSONデシリアライズ
+            using (var json = new MemoryStream(System.Text.Encoding.UTF8.GetBytes(jsonString)))
+            {
+                var ser = new System.Runtime.Serialization.Json.DataContractJsonSerializer(typeof(List<APIData.TChat>));
+                {
+                    var result = ser.ReadObject(json) as List<APIData.TChat>;
+                    foreach (var chat in result)
+                    {
+                        var chatRoom = new Models.TDataChatRoom()
+                        {
+                            ID = chat.id,
+                            Name = chat.name,
+                            ChatTemplateId = chat.chat_template_id,
+                            RetrieverIDs = chat.retriever_ids,
+                        };
+                        this.ChatRooms.Add(chatRoom);
+                    }
+                    json.Close();
+                }
+            }
+        }
+        #endregion
 
         #region "JSON関連"
         [DataContract]

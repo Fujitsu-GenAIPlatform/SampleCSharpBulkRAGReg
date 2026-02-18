@@ -265,7 +265,7 @@ namespace SampleCSharpBulkRAGReg.ViewModels
                         try
                         {
                             Commons.LogHelper.WriteLog($"Start Create Retriever from Folder. FolderName: {FolderName}");
-                            await this.RagModel.CreateRetrieverFromFolder(FolderName);
+                            await this.RagModel.CreateRetrieverFromFolder(FolderName, true);
                             Commons.LogHelper.WriteLog($"Completed Create Retriever from Folder. FolderName: {FolderName}");
                         }
                         catch (Exception ex)
